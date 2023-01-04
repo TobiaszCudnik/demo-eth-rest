@@ -1,0 +1,18 @@
+# keep in sync with docker-compose.yml
+
+:80 {
+    encode zstd gzip
+
+    # 3 workers
+    reverse_proxy eth-rest-01:80 eth-rest-02:80 eth-rest-03:80 {
+
+    # 1 worker
+    #reverse_proxy eth-rest-01:80 {
+
+        health_uri /
+        health_interval 5s
+        health_timeout 3s
+        health_status 200
+
+    }
+}

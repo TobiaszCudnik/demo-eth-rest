@@ -1,0 +1,103 @@
+version: '3'
+
+dotenv: ['.env']
+
+tasks:
+
+  debug:
+    desc: Run in debug mode
+    dir: cmd/eth-rest
+    cmds:
+      - go install github.com/go-delve/delve/cmd/dlv@latest
+      - dlv debug --headless --listen=:2345 --api-version=2 --accept-multiclient --continue
+
+  build:
+    desc: Build a binary
+    dir: cmd/eth-rest
+    cmds:
+      - go build eth-rest.go
+    silent: true
+
+  start:
+    desc: Start from source
+    cmds:
+      - go run cmd/eth-rest/eth-rest.go
+    silent: true
+
+  test:
+    desc: Run go test
+    cmds:
+      - go clean -testcache
+      - go test ./... -v
+
+  test-locks:
+    desc: Test if redis locking works
+    cmds:
+      - task: flush-cache
+      - task test-locks-1 test-locks-2 --parallel
+
+  test-locks-1:
+    internal: true
+    cmds:
+      - http --quiet GET :$HTTP_PORT_TEST/v1/block/0x5BAD55
+
+  test-locks-2:
+    internal: true
+    cmds:
+      - http --quiet GET :$HTTP_PORT_TEST/v1/block/0x5BAD55
+
+  benchmark-blocks:
+    desc: Benchmark 100 random blocks
+    cmds:
+      - node scripts/gen-blocks-rand.js 100 > scripts/rand-100-blocks
+      - siege -b -c 100 -r 1 -i -f scripts/rand-100-blocks --no-parser --no-follow
+
+  test-load-blocks:
+    desc: Load test 10k random blocks for 1 minute
+    cmds:
+      - task: flush-cache
+      - node scripts/gen-blocks-rand.js 10000 > scripts/rand-10k-blocks
+      - timeout 1m siege -b -c 100 -i -f scripts/rand-10k-blocks --no-parser --no-follow
+
+  docker-start:
+    desc: Start docker compose
+    cmds:
+      - docker-compose up --build load-balancer
+
+  docker-rebuild-start:
+    desc: Rebuild and start docker compose
+    cmds:
+      - docker-compose up --force-recreate --build
+
+  docker-stop:
+    desc: Stop docker compose
+    cmds:
+      - docker-compose down
+
+  flush-cache:
+    desc: Flush redis cache
+    cmds:
+      - docker-compose restart redis
+      - sleep 0.1
+
+  restart-load-balancer:
+    desc: Restart the load balancer with a new config
+    cmds:
+      - docker-compose restart load-balancer
+
+  rebuild-test-instance:
+    desc: Rebuild the test instance
+    cmds:
+      - docker-compose stop eth-rest-test
+      - docker-compose up --force-recreate --build eth-rest-test
+
+  clean:
+    desc: Stop and remove all the data
+    cmds:
+      - task: docker-stop
+      - docker-compose down --volumes
+
+  kill:
+    desc: Kill the service process
+    cmds:
+      - killall -9 eth-rest

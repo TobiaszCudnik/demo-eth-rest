@@ -1,0 +1,90 @@
+version: '3'
+
+services:
+  # WORKERS
+  # keep in sync with Caddyfile
+
+  eth-rest-01:
+    build: .
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    environment:
+      - HTTP_PORT=80
+    volumes:
+      - gopath:/go/pkg
+      - gocache:/root/.cache/go-build
+
+  eth-rest-02:
+    build: .
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    environment:
+      - HTTP_PORT=80
+    volumes:
+      - gopath:/go/pkg
+      - gocache:/root/.cache/go-build
+
+  eth-rest-03:
+    build: .
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    environment:
+      - HTTP_PORT=80
+    volumes:
+      - gopath:/go/pkg
+      - gocache:/root/.cache/go-build
+
+  # TEST
+
+  eth-rest-test:
+    build: .
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    environment:
+      - HTTP_PORT=80
+      - ETH_REQ_DELAY_SEC=0.5
+    volumes:
+      - gopath:/go/pkg
+      - gocache:/root/.cache/go-build
+#    entrypoint: task test
+    ports:
+      - "${HTTP_PORT_TEST}:80"
+      - 2345:2345
+    entrypoint: task debug
+    security_opt:
+      - seccomp:unconfined
+
+  # DEPS
+
+  redis:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./configs/redis.conf:/usr/local/etc/redis/redis.conf
+
+  load-balancer:
+    image: caddy:2-alpine
+    volumes:
+      - ./configs/Caddyfile:/etc/caddy/Caddyfile
+    depends_on:
+      - eth-rest-01
+      - eth-rest-02
+      - eth-rest-03
+    ports:
+      - "${HTTP_PORT}:80"
+
+volumes:
+  gopath:
+  gocache:
+  rabbitmq-data:
+  rabbitmq-log:
